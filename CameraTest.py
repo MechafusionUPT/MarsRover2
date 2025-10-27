@@ -1,4 +1,4 @@
-from flask import Flask, render_template_string, Response
+from flask import Flask, render_template, render_template_string, Response
 import cv2
 from pyzbar import pyzbar
 import os
@@ -101,46 +101,7 @@ def video_feed():
 # ----------------------------------------------------------
 @app.route("/")
 def index():
-    return render_template_string("""
-    <!DOCTYPE html>
-    <html lang="ro">
-    <head>
-        <meta charset="UTF-8">
-        <title>QR & Sensor Data + Live Camera</title>
-        <style>
-            body { font-family: Arial; margin: 20px; }
-            h1 { color: #333; }
-            .data { font-size: 1.1em; margin-bottom: 20px; }
-            .url { margin-top: 10px; }
-            img { border: 1px solid #ccc; }
-        </style>
-    </head>
-    <body>
-        <h1>QR & Sensor Data (Live)</h1>
-        <div class="data">
-            <p><b>Ultimul cod QR detectat:</b> <span id="qr">{{ content }}</span></p>
-            <p class="url"><b>URL generat:</b> <a id="url" href="{{ url }}" target="_blank">{{ url }}</a></p>
-        </div>
-
-        <h2>Live Camera Feed</h2>
-        <img src="{{ url_for('video_feed') }}" width="640" height="480">
-
-        <script>
-            async function updateData() {
-                try {
-                    const r = await fetch('/data');
-                    const data = await r.json();
-                    document.getElementById("qr").textContent = data.content;
-                    const urlElem = document.getElementById("url");
-                    urlElem.href = data.url;
-                    urlElem.textContent = data.url;
-                } catch(e) { console.error(e); }
-            }
-            setInterval(updateData, 2000);
-        </script>
-    </body>
-    </html>
-    """, content=qr_content, url=generated_url)
+    return render_template("qr_livefeed.html", content=qr_content, url=generated_url)
 
 
 @app.route("/data")
