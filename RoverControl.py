@@ -26,7 +26,9 @@ from motors.gripper import (
     pitch_up,
     pitch_down,
     servo_up,
-    servo_down
+    servo_down,
+    grip_sus,
+    grip_jos
 )
 
 TEAM_NAME = "ALSERA"
@@ -197,12 +199,13 @@ def handle_joystick_command_simple(cmd: dict):
         DEGREE = 40
         if grip == 1:
             print("CMD: GRIP CLOSE")
-            servo_up(DEGREE)
+            #servo_up(DEGREE)
+            grip_sus()
 
         if grip == -1:
             print("CMD: GRIP OPEN")
-            servo_down(DEGREE)
-
+            #servo_down(DEGREE)
+            grip_jos()
         # ---------------- PITCH ----------------------
         if pitch == 1:
             print("CMD: PITCH UP")

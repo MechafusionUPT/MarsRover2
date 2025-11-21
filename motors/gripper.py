@@ -3,6 +3,11 @@ import board
 import busio
 from adafruit_pca9685 import PCA9685
 
+
+def duty(angle, min_us=500, max_us=2500):
+    pulse = min_us + (angle / 180.0) * (max_us - min_us)
+    return int((pulse / 20000) * 65535)
+
 # ============================================================
 #  PCA9685 SETUP (servos = address 0x40, frequency = 50Hz)
 # ============================================================
@@ -27,13 +32,13 @@ PERIOD_US = 20000 # 20ms => 50Hz
 #  RANGE DEFINIȚII
 # ============================================================
 # GRIPPER
-GRIP_CLOSED = 20      # apropiat
-GRIP_OPEN   = 100     # deschis total
-DEFAULT_GRIP = 60
+GRIP_CLOSED = 140     # apropiat
+GRIP_OPEN   = 180    # deschis total
+DEFAULT_GRIP = 140
 
 # PITCH
-PITCH_UP = 50         # sus
-PITCH_DOWN = 130      # jos
+PITCH_UP = 70        # sus
+PITCH_DOWN = 110      # jos
 DEFAULT_PITCH = 90
 
 # ============================================================
@@ -115,8 +120,7 @@ def change_pitch(delta):
     set_pitch(new_angle)
 
 SERVO_CH = 0
-current_angle = 90  # pornește de la 90° (poți schimba)
-
+servo_angle = 90
 def servo_down(x):
     """Mișcă servo-ul în JOS cu x grade."""
     global current_angle
@@ -128,3 +132,9 @@ def servo_up(x):
     global current_angle
     current_angle = max(0, current_angle - x)    # scădem unghiul
     pca.channels[SERVO_CH].duty_cycle = angle_to_duty(current_angle)
+
+def grip_sus():
+    pca.channels[0].duty_cycle = angle_to_duty(140)
+
+def grip_jos():
+    pca.channels[0].duty_cycle = angle_to_duty(180)

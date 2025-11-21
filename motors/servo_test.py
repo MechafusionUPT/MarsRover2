@@ -11,13 +11,19 @@ def duty(angle, min_us=500, max_us=2500):
     pulse = min_us + (angle / 180.0) * (max_us - min_us)
     return int((pulse / 20000) * 65535)
 
+"""
 print("Servo test: LEFT")
 pca.channels[0].duty_cycle = duty(0)
 time.sleep(1)
 
 print("Servo test: RIGHT")
-pca.channels[0].duty_cycle = duty(180)
+pca.channels[0].duty_cycle = duty(150)
 time.sleep(1)
+"""
+#print("Servo test: CENTER")
+#pca.channels[0].duty_cycle = duty(190)
 
-print("Servo test: CENTER")
-pca.channels[0].duty_cycle = duty(90)
+while True:
+    print("JOS")
+    pca.channels[0].duty_cycle = duty(140) //sus
+    time.sleep(3)
