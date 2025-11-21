@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Joystick Rover Control</title>
+    <style>
+        body { font-family: Arial; text-align: center; margin-top: 50px; }
+        .arrow-container { position: relative; width: 200px; height: 200px; margin: auto; }
+        .arrow { position: absolute; width: 0; height: 0; border-style: solid; opacity: 0.3; }
+        #up    { border-width: 0 20px 40px 20px;  border-color: transparent transparent black transparent; top: 0; left: 80px; }
+        #down  { border-width: 40px 20px 0 20px; border-color: black transparent transparent transparent; bottom: 0; left: 80px; }
+        #left  { border-width: 20px 40px 20px 0; border-color: transparent black transparent transparent; top: 80px; left: 0; }
+        #right { border-width: 20px 0 20px 40px; border-color: transparent transparent transparent black; top: 80px; right: 0; }
+        .active { opacity: 1; border-color: red; }
+    </style>
+</head>
+<body>
+    <h1>Joystick Rover Control</h1>
+    <h2 id="speedVal">Speed: 0</h2>
+
+    <div class="arrow-container">
+        <div class="arrow" id="up"></div>
+        <div class="arrow" id="down"></div>
+        <div class="arrow" id="left"></div>
+        <div class="arrow" id="right"></div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <script>
+        const socket = io("http://" + location.hostname + ":8000");
+
+        socket.on("move_update", data => {
+            const { direction, speed } = data;
+            document.getElementById("speedVal").textContent = "Speed: " + speed;
+
+            ["up","down","left","right"].forEach(id =>
+                document.getElementById(id).classList.remove("active")
+            );
+
+            if (direction === "INAINTE") document.getElementById("up").classList.add("active");
+            if (direction === "INAPOI")  document.getElementById("down").classList.add("active");
+            if (direction === "STANGA")  document.getElementById("left").classList.add("active");
+            if (direction === "DREAPTA") document.getElementById("right").classList.add("active");
+        });
+    </script>
+</body>
+</html>

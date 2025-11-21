@@ -1,38 +1,210 @@
 <!DOCTYPE html>
-    <html lang="ro">
-    <head>
-        <meta charset="UTF-8">
-        <title>QR & Sensor Data + Live Camera</title>
-        <style>
-            body { font-family: Arial; margin: 20px; }
-            h1 { color: #333; }
-            .data { font-size: 1.1em; margin-bottom: 20px; }
-            .url { margin-top: 10px; }
-            img { border: 1px solid #ccc; }
-        </style>
-    </head>
-    <body>
-        <h1>QR & Sensor Data (Live)</h1>
-        <div class="data">
-            <p><b>Ultimul cod QR detectat:</b> <span id="qr">{{ content }}</span></p>
-            <p class="url"><b>URL generat:</b> <a id="url" href="{{ url }}" target="_blank">{{ url }}</a></p>
-        </div>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <title>QR & Sensor Data + Live Camera</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        h1 { color: #333; }
+        .data { font-size: 1.1em; margin-bottom: 20px; }
+        .url { margin-top: 10px; }
+        img { border: 1px solid #ccc; }
+        .gp-box {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            max-width: 640px;
+        }
+        .ok { color: green; }
+        .err { color: red; }
+    </style>
 
-        <h2>Live Camera Feed</h2>
-        <img src="{{ url_for('video_feed') }}" width="640" height="480">
+    <!-- Socket.IO client -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>QR & Sensor Data (Live)</h1>
+    <div class="data">
+        <p><b>Ultimul cod QR detectat:</b> <span id="qr">{{ content }}</span></p>
+        <p class="url">
+            <b>URL generat:</b>
+            <a id="url" href="{{ url }}" target="_blank">{{ url }}</a>
+        </p>
+    </div>
 
-        <script>
-            async function updateData() {
-                try {
-                    const r = await fetch('/data');
-                    const data = await r.json();
-                    document.getElementById("qr").textContent = data.content;
-                    const urlElem = document.getElementById("url");
-                    urlElem.href = data.url;
-                    urlElem.textContent = data.url;
-                } catch(e) { console.error(e); }
-            }
-            setInterval(updateData, 2000);
-        </script>
-    </body>
-    </html>
+<h2>Live Camera Feeds</h2>
+
+<div style="
+    display: flex;
+    gap: 25px;
+    align-items: flex-start;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+">
+
+    <div style="text-align:center;">
+        <h3>Camera Rover</h3>
+        <img src="{{ url_for('video_feed') }}"
+             style="width: 640px; height: 480px; border:3px solid #444; border-radius: 8px; transform: rotate(180deg); transform-origin: center;">
+    </div>
+
+    <div style="text-align:center;">
+        <h3>Camera Gripper</h3>
+        <img src="{{ url_for('video_feed2') }}"
+             style="width: 640px; height: 480px; border:3px solid #444; border-radius: 8px; transform: rotate(180deg); transform-origin: center;">
+    </div>
+
+</div>
+
+
+
+    <!-- Joystick -->
+    <div class="gp-box">
+        <h2>Control Rover (Gamepad)</h2>
+        <p id="gp-status">controller: <span class="err">neconectat</span></p>
+        <p id="gp-vals">vx=0.00 vy=0.00 sx=0.00 grip=0 pitch=0</p>
+        <button id="test-btn">Trimite TEST forward (fara gamepad)</button>
+        <p style="font-size:0.9em;color:#555;">
+            * Conectează un controller, apasă un buton, apoi dă click pe pagină ca să pornească citirea Gamepad.<br>
+            * Vezi console (F12) pentru debug Socket.IO.
+        </p>
+    </div>
+
+    <script>
+        // ==============================
+        // UPDATE DATE QR DIN /data
+        // ==============================
+        async function updateData() {
+            try {
+                const r = await fetch('/data');
+                const data = await r.json();
+                document.getElementById("qr").textContent = data.content;
+                const urlElem = document.getElementById("url");
+                urlElem.href = data.url;
+                urlElem.textContent = data.url;
+            } catch(e) { console.error(e); }
+        }
+        setInterval(updateData, 2000);
+
+        // ==============================
+        // SOCKET.IO
+        // ==============================
+        const socket = io();
+
+        socket.on("connect", () => {
+            console.log("SOCKET.IO conectat, id =", socket.id);
+        });
+
+        socket.on("connect_error", (err) => {
+            console.error("SOCKET.IO connect_error:", err.message);
+        });
+
+        socket.on("disconnect", (reason) => {
+            console.log("SOCKET.IO disconnect:", reason);
+        });
+
+        // Buton test (trimite direct o comanda forward)
+        document.getElementById("test-btn").addEventListener("click", () => {
+            console.log("TRIMIT TEST control.move vy=1.0");
+            socket.emit("control.move", { vx: 0, vy: 1.0, sx: 0, grip: 0, pitch: 0 });
+        });
+
+        // ==============================
+// JOYSTICK
+// ==============================
+const gpStatusEl = document.getElementById('gp-status');
+const valsEl = document.getElementById('gp-vals');
+
+let gpIndex = null;
+let vx = 0, vy = 0, sx = 0, grip = 0, pitch = 0;
+
+const DEADZONE = 0.15;
+const EPS = 0.01;
+
+let last = { vx: 0, vy: 0, sx: 0, grip: 0 , pitch: 0};
+let lastSend = 0;
+
+const dz = x => Math.abs(x) < DEADZONE ? 0 : (x - Math.sign(x) * DEADZONE) / (1 - DEADZONE);
+const clamp = (x, a = -1, b = 1) => Math.max(a, Math.min(b, x));
+const expo = (x, k = 1.3) => Math.sign(x) * Math.pow(Math.abs(x), k);
+const nearly = (a,b) => Math.abs(a-b) < EPS;
+
+function sendThrottled() {
+    const now = performance.now();
+    const changed = !(
+        nearly(vx, last.vx) &&
+        nearly(vy, last.vy) &&
+        nearly(sx, last.sx) &&
+        nearly(grip, last.grip) &&
+        nearly(pitch, last.pitch)
+    );
+
+    if (!changed && (now - lastSend) < 50) return;
+
+    last = { vx, vy, sx, grip, pitch };
+    lastSend = now;
+
+    socket.emit("control.move", last);
+
+    valsEl.textContent =
+        `vx=${vx.toFixed(2)} vy=${vy.toFixed(2)} `
+        + `sx=${sx.toFixed(2)} grip=${grip} pitch=${pitch}`;
+}
+
+window.addEventListener("gamepadconnected", e => {
+    gpIndex = e.gamepad.index;
+    gpStatusEl.innerHTML = `controller: <span class="ok">${e.gamepad.id}</span>`;
+    console.log("Gamepad conectat:", e.gamepad.id);
+});
+
+window.addEventListener("gamepaddisconnected", () => {
+    gpIndex = null;
+    gpStatusEl.innerHTML = `controller: <span class="err">neconectat</span>`;
+    vx = vy = sx = 0;
+    grip = pitch = 0;
+    sendThrottled();
+});
+
+function poll() {
+    const gps = navigator.getGamepads ? navigator.getGamepads() : [];
+    const gp = gpIndex != null ? gps[gpIndex] : null;
+
+    if (gp && gp.connected) {
+        const ax0 = dz(gp.axes[0] || 0);
+        const ax1 = dz(gp.axes[1] || 0);
+        const ax2 = dz(gp.axes[2] || 0);
+
+        vx = clamp(expo(ax0));
+        vy = clamp(expo(-ax1));   // înainte pozitiv
+        sx = clamp(expo(ax2));
+
+        // ============================
+        // BUTTON MAPPING (PS4)
+        // ============================
+
+        // GRIPPER
+        if (gp.buttons[0]?.pressed)       grip = 1;    // X = CLOSE
+        else if (gp.buttons[2]?.pressed)  grip = -1;   // Square = OPEN
+        else                               grip = 0;
+
+        // PITCH
+        if (gp.buttons[3]?.pressed)       pitch = 1;   // Triangle = UP
+        else if (gp.buttons[1]?.pressed)  pitch = -1;  // Circle = DOWN
+        else                               pitch = 0;
+
+        sendThrottled();
+    }
+
+    requestAnimationFrame(poll);
+}
+
+document.addEventListener("click", function initOnce() {
+    document.removeEventListener("click", initOnce);
+    console.log("Pornesc poll gamepad");
+    requestAnimationFrame(poll);
+});
+
+
+    </script>
+</body>
+</html>
